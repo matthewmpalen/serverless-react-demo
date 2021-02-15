@@ -1,0 +1,9 @@
+app: serverless-react-demo
+name: serverless-react-demo
+component: website
+
+inputs:
+  src:
+    src: ./src
+    hook: npm run build
+    dist: ./dist
