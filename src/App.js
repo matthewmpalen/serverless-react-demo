@@ -33,7 +33,7 @@ export default class App extends Component {
 
     render() {
         const exchange = 'binance';
-        const ticker = 'BTC-USDT';
+        const ticker = 'BTCUSDT';
 
         return (
             <div className="container">

@@ -1,20 +1,30 @@
 import React, {useRef, useEffect, useState} from 'react';
 
 
-const getWebsocket = (exchange, ticker) => {
-    let ws = new WebSocket(`wss://marketdata.daix.io/marketdata/?exchange=${exchange}&ticker=${ticker}`);
-    ws.onopen = () => console.log('ws opened');
+const getWebsocket = (ticker) => {
+    let ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${ticker}@aggTrade`);
+    ws.onopen = () => {
+        console.log('ws opened');
+        const payload = JSON.stringify({
+            method: "SUBSCRIBE",
+            params: [
+                `${ticker.toLowerCase()}@aggTrade`
+            ],
+            id: 1
+        });
+        ws.send(payload);
+    };
     ws.onclose = () => console.log('ws closed');
     return ws;
 };
 
 export const Trades = (props) => {
-    const {exchange, ticker} = props;
+    const {ticker} = props;
     const [trades, setTrades] = useState([]);
     const ws = useRef(null);
 
     useEffect(() => {
-        ws.current = getWebsocket(exchange, ticker);
+        ws.current = getWebsocket(ticker);
 
         return () => {
             ws.current.close();
@@ -27,18 +37,34 @@ export const Trades = (props) => {
         }
 
         ws.current.onmessage = e => {
-            const msg = JSON.parse(JSON.parse(e.data));
-            if (msg.Type == 'trade') {
-                if (trades.length > 10) {
-                    setTrades([]);
-                } else {
-                    setTrades([...trades, msg]);
+            const { data: payload } = e;
+            if (payload) {
+
+                const msg = JSON.parse(payload);
+                const { data } = msg;
+                if (data) {
+                    const { a: id, T: dt, s: symbol, p: price, q: quantity, m: isBuy } = data;
+                    const side = isBuy ? 'buy' : 'sell';
+
+                    const trade = {
+                        trade_id: id,
+                        side,
+                        price: parseFloat(price),
+                        volume: parseFloat(quantity),
+                        created_at: dt,
+                    };
+
+                    if (trades.length > 10) {
+                        setTrades([]);
+                    } else {
+                        setTrades([...trades, trade]);
+                    }
                 }
             }
+
+
         };
     }, [trades]);
-
-    let previous = 0;
 
     return (
         <div>
@@ -46,6 +72,7 @@ export const Trades = (props) => {
                 <thead>
                 <tr style={{color: 'white'}}>
                     <th>ID</th>
+                    <th>Side</th>
                     <th>Price</th>
                     <th>Volume</th>
                     <th>Timestamp</th>
@@ -55,17 +82,13 @@ export const Trades = (props) => {
                 <tbody>
                 {
                     trades.map((trade) => {
-                        const {trade_id, price, size, volume, created_at} = trade;
-                        let color = 'green';
-                        if (price < previous) {
-                            color = 'red';
-                        }
-
-                        previous = price;
+                        const {trade_id, side, price, volume, created_at} = trade;
+                        const color = side == 'buy' ? 'green' : 'red';
 
                         return (
-                            <tr style={{color: color}}>
+                            <tr key={trade_id} style={{color: color}}>
                                 <td>{trade_id}</td>
+                                <td>{side}</td>
                                 <td>{price}</td>
                                 <td>{volume}</td>
                                 <td>{created_at}</td>
